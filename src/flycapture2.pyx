@@ -128,55 +128,6 @@ cdef class Context:
         if not trigger_mode_info.present:
             raise ApiError("Camera does not support external trigger")
 
-    def remove_external_trigger(self):
-        cdef fc2Error r
-        cdef fc2TriggerMode triggerMode
-        with nogil:
-            r = fc2GetTriggerMode(self.ctx, &triggerMode)
-        raise_error(r)
-        # Set camera to trigger mode 0
-        triggerMode.onOff = False
-        triggerMode.mode = 0
-        triggerMode.parameter = 0
-
-        # Triggering the camera externally using source 0.
-        triggerMode.source = 0
-
-        with nogil:
-            r = fc2SetTriggerMode(self.ctx, &triggerMode)
-        raise_error(r)
-
-    def setup_external_trigger(self):
-        cdef fc2Error r
-        cdef fc2TriggerMode triggerMode
-        with nogil:
-            r = fc2GetTriggerMode(self.ctx, &triggerMode)
-        raise_error(r)
-        # Set camera to trigger mode 0
-        triggerMode.onOff = True
-        triggerMode.mode = 0
-        triggerMode.parameter = 0
-
-        # Triggering the camera externally using source 0.
-        triggerMode.source = 0
-
-        with nogil:
-            r = fc2SetTriggerMode(self.ctx, &triggerMode)
-        raise_error(r)
-
-        cdef fc2Config config
-        with nogil:
-            r = fc2GetConfiguration(self.ctx, &config)
-        raise_error(r)
-
-        # Set the grab timeout to 50 seconds
-        config.grabTimeout = 5000
-
-        # Set the camera configuration
-        with nogil:
-            r = fc2SetConfiguration(self.ctx, &config)
-        raise_error(r)
-
     def get_video_mode_and_frame_rate_info(self,
             fc2VideoMode mode, fc2FrameRate framerate):
         cdef fc2Error r
@@ -222,12 +173,7 @@ cdef class Context:
         with nogil:
             r = fc2StopCapture(self.ctx)
         raise_error(r)
-
-    def poll_for_trigger_ready(self):
-        cdef fc2Error r
-        r = PollForTriggerReady(self.ctx)
-        raise_error(r)
-
+        
     def retrieve_buffer(self, Image img=None):
         cdef fc2Error r
         if img is None:
