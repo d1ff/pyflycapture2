@@ -19,8 +19,6 @@
 from _FlyCapture2_C cimport *
 include "flycapture2_enums.pxi"
 
-from _utils cimport *
-
 import numpy as np
 cimport numpy as np
 
