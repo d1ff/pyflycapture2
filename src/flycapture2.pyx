@@ -18,6 +18,8 @@
 
 from _FlyCapture2_C cimport *
 include "flycapture2_enums.pxi"
+from libc.stdlib cimport malloc, free
+
 
 import numpy as np
 cimport numpy as np
@@ -47,6 +49,19 @@ def get_library_version():
     raise_error(r)
     return {"major": v.major, "minor": v.minor,
             "type": v.type, "build": v.build}
+
+def set_default_color_processing(fc2ColorProcessingAlgorithm algorithm):
+    cdef fc2Error r
+    with nogil:
+        r = fc2SetDefaultColorProcessing(algorithm)
+    raise_error(r)
+
+def get_default_color_processing():
+    cdef fc2Error r
+    cdef fc2ColorProcessingAlgorithm algorithm
+    with nogil:
+        r = fc2GetDefaultColorProcessing(&algorithm)
+    return algorithm
 
 cdef class Context:
     cdef fc2Context ctx
@@ -285,18 +300,19 @@ cdef class Image:
             r = fc2DestroyImage(&self.img)
         raise_error(r)
 
-    def save(self, filename, format):
+    def save(self, filename, format=None):
         cdef fc2Error r
-        with nogil:
-            r = fc2SaveImage(&self.img, filename, format)
+        cdef _fc2ImageFileFormat ff = format or FC2_FROM_FILE_EXT
+        r = fc2SaveImage(&self.img, filename, ff)
         raise_error(r)
 
     def convert(self, pixel_format=None):
         cdef fc2Error r
+        cdef _fc2PixelFormat pix_fmt = pixel_format or FC2_UNSPECIFIED_PIXEL_FORMAT
         img = Image()
         with nogil:
-            if pixel_format:
-                r = fc2ConvertImageTo(pixel_format, &self.img, &img.img)
+            if pix_fmt != FC2_UNSPECIFIED_PIXEL_FORMAT:
+                r = fc2ConvertImageTo(pix_fmt, &self.img, &img.img)
             else:
                 r = fc2ConvertImage(&self.img, &img.img)
         raise_error(r)
@@ -304,27 +320,44 @@ cdef class Image:
 
     def __array__(self):
         cdef np.ndarray r
-        cdef np.npy_intp shape[2]
-        cdef np.npy_intp stride[2]
+        cdef np.npy_intp* shape = NULL
+        cdef np.npy_intp* stride = NULL
         cdef np.dtype dtype
+        nd = 2
         if self.img.format == PIXEL_FORMAT_MONO8:
             dtype = np.dtype("uint8")
+            shape = <np.npy_intp*>malloc(2*sizeof(np.npy_intp))
+            stride = <np.npy_intp*>malloc(2*sizeof(np.npy_intp))
             stride[1] = 1
         elif self.img.format == PIXEL_FORMAT_MONO16:
             dtype = np.dtype("uint16")
+            shape = <np.npy_intp*>malloc(2*sizeof(np.npy_intp))
+            stride = <np.npy_intp*>malloc(2*sizeof(np.npy_intp))
             stride[1] = 2
+        elif self.img.format == PIXEL_FORMAT_BGR:
+            dtype = np.dtype("uint8")
+            shape = <np.npy_intp*>malloc(3*sizeof(np.npy_intp))
+            nd = 3
+            shape[2] = 3
         else:
             dtype = np.dtype("uint8")
+            shape = <np.npy_intp*>malloc(2*sizeof(np.npy_intp))
+            stride = <np.npy_intp*>malloc(2*sizeof(np.npy_intp))
             stride[1] = self.img.stride/self.img.cols
         Py_INCREF(dtype)
         shape[0] = self.img.rows
         shape[1] = self.img.cols
-        stride[0] = self.img.stride
+        if stride != NULL:
+            stride[0] = self.img.stride
         #assert stride[0] == stride[1]*shape[1]
         #assert shape[0]*shape[1]*stride[1] == self.img.dataSize
         r = PyArray_NewFromDescr(np.ndarray, dtype,
-                2, shape, stride,
+                nd, shape, stride,
                 self.img.pData, np.NPY_DEFAULT, None)
         r.base = <PyObject *>self
         Py_INCREF(self)
+        if shape != NULL:
+            free(shape)
+        if stride != NULL:
+            free(stride)
         return r
