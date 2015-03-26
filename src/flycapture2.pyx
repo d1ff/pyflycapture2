@@ -171,7 +171,7 @@ cdef class Context:
         with nogil:
             r = fc2StopCapture(self.ctx)
         raise_error(r)
-        
+
     def retrieve_buffer(self, Image img=None):
         cdef fc2Error r
         if img is None:
@@ -236,7 +236,7 @@ cdef class Context:
         with nogil:
             r = fc2SetProperty(self.ctx, &p)
         raise_error(r)
-    
+
     def get_trigger_mode(self):
         cdef fc2Error r
         cdef fc2TriggerMode tm
@@ -260,14 +260,14 @@ cdef class Context:
         with nogil:
             r = fc2SetTriggerMode(self.ctx, &tm)
         raise_error(r)
-    
+
     def fire_software_trigger(self):
         cdef fc2Error r
         with nogil:
             r = fc2FireSoftwareTrigger(self.ctx)
         raise_error(r)
-    
-        
+
+
 
 
 cdef class Image:
@@ -284,6 +284,23 @@ cdef class Image:
         with nogil:
             r = fc2DestroyImage(&self.img)
         raise_error(r)
+
+    def save(self, filename, format):
+        cdef fc2Error r
+        with nogil:
+            r = fc2SaveImage(&self.img, filename, format)
+        raise_error(r)
+
+    def convert(self, pixel_format=None):
+        cdef fc2Error r
+        img = Image()
+        with nogil:
+            if pixel_format:
+                r = fc2ConvertImageTo(pixel_format, &self.img, &img.img)
+            else:
+                r = fc2ConvertImage(&self.img, &img.img)
+        raise_error(r)
+        return img
 
     def __array__(self):
         cdef np.ndarray r
